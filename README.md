@@ -80,3 +80,23 @@ Analyst extension, plus your own local network dataset):
 Before running `drivetime_arcgis.py` or `drivetime_arcgis.R`, replace the
 placeholder path (`NETWORK_DATASET` / `network_dataset`) with the path to
 your own network dataset.
+
+## Esri credit usage
+
+The ArcGIS scripts geocode one address at a time (not a batch call), which
+Esri classifies as **interactive geocoding** -- this is free and doesn't
+consume credits. Routing against a local network dataset via `arcpy` is also
+free, since it isn't a hosted Esri service.
+
+If you adapt this for many addresses at once, note Esri's general credit
+rules for the World Geocoding Service:
+
+- Single-address lookups (one at a time, not stored): free
+- Batch geocoding (a table/list of addresses in one call): **40 credits per
+  1,000 records**
+- Storing geocode results permanently (e.g. in a hosted feature layer):
+  consumes credits regardless of interactive vs. batch
+
+Credit policy and your org's specific allotment can vary -- check your
+ArcGIS Online organization's credit settings or Esri's current service
+credits documentation before relying on this for anything at scale.
