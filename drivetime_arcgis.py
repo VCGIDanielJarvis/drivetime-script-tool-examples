@@ -1,12 +1,13 @@
 """ArcGIS Network Analyst drive-time lookup for comparison against Google Maps.
 Uses a locally licensed ArcGIS Pro install and a local Network Analyst dataset
-via arcpy -- no public demo server, rate limits, or OSM speed data involved.
+via arcpy -- no public demo server, OSM data, or Nominatim rate limits involved.
 """
 
 from urllib.parse import quote
 
 import arcpy
-import requests
+from arcgis.geocoding import geocode
+from arcgis.gis import GIS
 
 NETWORK_DATASET = r"C:\Users\REPLACEWITHYOURLOCALPATH\NetworkDataset.gdb\Transportation\Streets_ND"
 ORIGIN_ADDRESS = "1 Main St, Burlington, VT 05401"
@@ -16,20 +17,20 @@ DESTINATION_ADDRESS = "1 National Life Drive, Montpelier, VT 05602"
 # the duration of the solve and returned afterward.
 arcpy.CheckOutExtension("network")
 
-# Geocode via OSM's free Nominatim service, same method used in the OSRM
-# scripts, just to get coordinates to feed into the network dataset solve.
-nominatim_url = "https://nominatim.openstreetmap.org/search"
-headers = {"User-Agent": "drivetime-script"}
-origin = requests.get(nominatim_url, params={"q": ORIGIN_ADDRESS, "format": "json", "limit": 1}, headers=headers).json()[0]
-destination = requests.get(nominatim_url, params={"q": DESTINATION_ADDRESS, "format": "json", "limit": 1}, headers=headers).json()[0]
+# Geocode via Esri's World Geocoding Service through the `arcgis` package
+# bundled with ArcGIS Pro -- authenticates implicitly via the local Pro
+# license (GIS("pro")), so Nominatim's public rate limit doesn't apply here.
+GIS("pro")
+origin = geocode(ORIGIN_ADDRESS)[0]["location"]
+destination = geocode(DESTINATION_ADDRESS)[0]["location"]
 
 route_solver = arcpy.nax.Route(NETWORK_DATASET)
 route_solver.travelMode = arcpy.nax.GetTravelModes(NETWORK_DATASET)["Driving a Car"]
 
 wgs84 = arcpy.SpatialReference(4326)
 with route_solver.insertCursor(arcpy.nax.RouteInputDataType.Stops, ["SHAPE@"]) as cursor:
-    cursor.insertRow((arcpy.PointGeometry(arcpy.Point(float(origin["lon"]), float(origin["lat"])), wgs84),))
-    cursor.insertRow((arcpy.PointGeometry(arcpy.Point(float(destination["lon"]), float(destination["lat"])), wgs84),))
+    cursor.insertRow((arcpy.PointGeometry(arcpy.Point(origin["x"], origin["y"]), wgs84),))
+    cursor.insertRow((arcpy.PointGeometry(arcpy.Point(destination["x"], destination["y"]), wgs84),))
 
 result = route_solver.solve()
 if not result.solveSucceeded:

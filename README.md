@@ -11,16 +11,35 @@ Google Maps link for the same trip, so the result can be compared by hand.
 
 ## What's here
 
-| Script | Language | Routing engine | Notes |
-|---|---|---|---|
-| [`drivetime_osrm.py`](drivetime_osrm.py) | Python | Public [OSRM](https://project-osrm.org/) demo server | Runs *two* sub-methods: geocoded addresses vs. hand-picked coordinates |
-| [`drivetime_osrm.R`](drivetime_osrm.R) | R | Public OSRM demo server (via the `osrm` package) | Same two sub-methods as the Python version |
-| [`drivetime_arcgis.py`](drivetime_arcgis.py) | Python | Local Esri Network Analyst dataset (via `arcpy`) | Requires a licensed ArcGIS Pro install and a local network dataset |
-| [`drivetime_arcgis.R`](drivetime_arcgis.R) | R | Same local Network Analyst dataset | R has no native Network Analyst binding, so it calls `arcpy` via `reticulate` |
+| Script | Language | Routing engine | Geocoding | Notes |
+|---|---|---|---|---|
+| [`drivetime_osrm.py`](drivetime_osrm.py) | Python | Public [OSRM](https://project-osrm.org/) demo server | Free OSM [Nominatim](https://nominatim.org/) service | Runs *two* sub-methods: geocoded addresses vs. hand-picked coordinates |
+| [`drivetime_osrm.R`](drivetime_osrm.R) | R | Public OSRM demo server (via the `osrm` package) | Free OSM Nominatim service (via `tmaptools`) | Same two sub-methods as the Python version |
+| [`drivetime_arcgis.py`](drivetime_arcgis.py) | Python | Local Esri Network Analyst dataset (via `arcpy`) | Esri World Geocoding Service (via the bundled `arcgis` package) | Requires a licensed ArcGIS Pro install and a local network dataset |
+| [`drivetime_arcgis.R`](drivetime_arcgis.R) | R | Same local Network Analyst dataset | Same Esri World Geocoding Service | R has no native Network Analyst binding, so it calls `arcpy`/`arcgis` via `reticulate` |
 
-All four geocode addresses using OpenStreetMap's free [Nominatim](https://nominatim.org/)
-service, so the geocoding step is identical across scripts -- any difference
-in the final drive-time estimate comes from the routing engine itself.
+The two OSRM scripts geocode via OpenStreetMap's free, public Nominatim
+service. The two ArcGIS scripts instead geocode via Esri's World Geocoding
+Service through the `arcgis` Python package bundled with ArcGIS Pro --
+authenticating implicitly off the local Pro license (`GIS("pro")`) rather
+than hitting a separate public endpoint, so Nominatim's usage-policy rate
+limit doesn't apply to the ArcGIS scripts.
+
+## Example run
+
+A single run against the same two addresses, for a quick side-by-side look:
+
+| Method | Drive time | Distance |
+|---|---|---|
+| OSRM -- geocoded address | 52.3 min | 63.0 km |
+| OSRM -- manual coordinates | 49.9 min | 62.7 km |
+| ArcGIS Network Analyst | 40.0 min | 62.1 km |
+| Google Maps (manual, for comparison) | ~43 min | -- |
+
+Numbers will drift over time (OSM data changes, Esri's network dataset speed
+models get updated, Google factors in conditions at the moment you check), but
+the relative pattern -- OSRM running slower than both ArcGIS and Google -- has
+been consistent across repeated runs during development.
 
 ## Why the results differ from Google Maps
 
@@ -53,10 +72,10 @@ hardcoded coordinates).
 **ArcGIS scripts** (require a licensed ArcGIS Pro install with the Network
 Analyst extension, plus your own local network dataset):
 
-- Python: run with the ArcGIS Pro Python environment (`arcpy` is bundled
-  with ArcGIS Pro; `requests` is also needed)
-- R: `reticulate`, `tmaptools`, and `reticulate::use_python()` pointed at
-  your ArcGIS Pro Python environment
+- Python: run with the ArcGIS Pro Python environment (`arcpy` and `arcgis`
+  are both bundled with ArcGIS Pro)
+- R: `reticulate`, and `reticulate::use_python()` pointed at your ArcGIS Pro
+  Python environment (which already has `arcpy` and `arcgis` installed)
 
 Before running `drivetime_arcgis.py` or `drivetime_arcgis.R`, replace the
 placeholder path (`NETWORK_DATASET` / `network_dataset`) with the path to

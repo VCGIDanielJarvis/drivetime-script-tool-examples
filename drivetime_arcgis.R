@@ -2,22 +2,25 @@
 # Uses a locally licensed ArcGIS Pro install and a local Network Analyst dataset.
 # R has no native Network Analyst binding, so `reticulate` calls into arcpy
 # running in the ArcGIS Pro Python environment -- no public demo server,
-# rate limits, or OSM speed data involved.
+# OSM data, or Nominatim rate limits involved.
 
 library(reticulate)
-library(tmaptools)
 
 use_python("C:/Program Files/ArcGIS/Pro/bin/Python/envs/arcgispro-py3/python.exe", required = TRUE)
 arcpy <- import("arcpy")
+gis_module <- import("arcgis.gis")
+geocoding_module <- import("arcgis.geocoding")
 
 network_dataset <- "C:/Users/REPLACEWITHYOURLOCALPATH/NetworkDataset.gdb/Transportation/Streets_ND"
 origin_address <- "1 Main St, Burlington, VT 05401"
 destination_address <- "1 National Life Drive, Montpelier, VT 05602"
 
-# osrmRoute() needs coordinates, not addresses -- geocode via OSM's
-# free Nominatim service (same method used in the OSRM scripts).
-origin <- geocode_OSM(origin_address)$coords
-destination <- geocode_OSM(destination_address)$coords
+# Geocode via Esri's World Geocoding Service through the `arcgis` package
+# bundled with ArcGIS Pro -- authenticates implicitly via the local Pro
+# license (GIS("pro")), so Nominatim's public rate limit doesn't apply here.
+invisible(gis_module$GIS("pro"))
+origin <- geocoding_module$geocode(origin_address)[[1]]$location
+destination <- geocoding_module$geocode(destination_address)[[1]]$location
 
 # Requires an active Network Analyst extension license, checked out for
 # the duration of the solve and returned afterward.
@@ -28,8 +31,8 @@ route_solver$travelMode <- arcpy$nax$GetTravelModes(network_dataset)[["Driving a
 
 wgs84 <- arcpy$SpatialReference(4326L)
 cursor <- route_solver$insertCursor(arcpy$nax$RouteInputDataType$Stops, list("SHAPE@"))
-invisible(cursor$insertRow(tuple(arcpy$PointGeometry(arcpy$Point(unname(origin["x"]), unname(origin["y"])), wgs84))))
-invisible(cursor$insertRow(tuple(arcpy$PointGeometry(arcpy$Point(unname(destination["x"]), unname(destination["y"])), wgs84))))
+invisible(cursor$insertRow(tuple(arcpy$PointGeometry(arcpy$Point(origin$x, origin$y), wgs84))))
+invisible(cursor$insertRow(tuple(arcpy$PointGeometry(arcpy$Point(destination$x, destination$y), wgs84))))
 invisible(cursor$`__exit__`(NULL, NULL, NULL))
 
 result <- route_solver$solve()
